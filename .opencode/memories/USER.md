@@ -21,3 +21,5 @@ The user prefers animation soundtracks to autoplay along with the animation when
 The user prefers animated stories not to show visible soundtrack details in the animation.
 §
 The user prefers animated stories to end with a final "The End" scene
+§
+The user prefers animated story narration to start automatically without requiring the viewer to click, tap, or press a key.
