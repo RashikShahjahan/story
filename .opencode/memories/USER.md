@@ -23,3 +23,5 @@ The user prefers animated stories not to show visible soundtrack details in the 
 The user prefers animated stories to end with a final "The End" scene
 §
 The user prefers animated story narration to start automatically without requiring the viewer to click, tap, or press a key.
+§
+The user prefers Bangla-language story narrations to use a neutral/standard Bangla storyteller voice, avoiding reporter/newsreader style and rural accents.
