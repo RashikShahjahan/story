@@ -15,3 +15,9 @@ The user prefers people in animated stories to look more lifelike.
 The user prefers animated people to have varied facing directions instead of all facing toward the screen.
 §
 The user prefers each new story to feel distinct and not overfit to or reuse patterns from older stories.
+§
+The user prefers animation soundtracks to autoplay along with the animation when possible.
+§
+The user prefers animated stories not to show visible soundtrack details in the animation.
+§
+The user prefers animated stories to end with a final "The End" scene
