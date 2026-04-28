@@ -16,19 +16,31 @@
 </head>
 <body>
 <section class="slide active" data-index="0">
-  <iframe src="file:///Users/rashik/story/animations/girl-liked-stars-1.html" title="girl-liked-stars-1.html"></iframe>
+  <iframe src="file:///Users/rashik/story/animations/mr-fox-1.html" title="mr-fox-1.html"></iframe>
 </section>
 <section class="slide" data-index="1">
-  <iframe src="file:///Users/rashik/story/animations/girl-liked-stars-2.html" title="girl-liked-stars-2.html"></iframe>
+  <iframe src="file:///Users/rashik/story/animations/mr-fox-2.html" title="mr-fox-2.html"></iframe>
 </section>
 <section class="slide" data-index="2">
-  <iframe src="file:///Users/rashik/story/animations/girl-liked-stars-3.html" title="girl-liked-stars-3.html"></iframe>
+  <iframe src="file:///Users/rashik/story/animations/mr-fox-3.html" title="mr-fox-3.html"></iframe>
 </section>
 <section class="slide" data-index="3">
-  <iframe src="file:///Users/rashik/story/animations/girl-liked-stars-4.html" title="girl-liked-stars-4.html"></iframe>
+  <iframe src="file:///Users/rashik/story/animations/mr-fox-4.html" title="mr-fox-4.html"></iframe>
+</section>
+<section class="slide" data-index="4">
+  <iframe src="file:///Users/rashik/story/animations/mr-fox-5.html" title="mr-fox-5.html"></iframe>
+</section>
+<section class="slide" data-index="5">
+  <iframe src="file:///Users/rashik/story/animations/mr-fox-6.html" title="mr-fox-6.html"></iframe>
+</section>
+<section class="slide" data-index="6">
+  <iframe src="file:///Users/rashik/story/animations/mr-fox-7.html" title="mr-fox-7.html"></iframe>
+</section>
+<section class="slide" data-index="7">
+  <iframe src="file:///Users/rashik/story/animations/mr-fox-8.html" title="mr-fox-8.html"></iframe>
 </section>
   <div class="hud">
-    <div><span id="counter">1</span> / 4</div>
+    <div><span id="counter">1</span> / 8</div>
     <div class="controls">
       <button id="prev" type="button">Previous</button>
       <button id="toggle" type="button">Pause</button>
@@ -53,7 +65,7 @@
 
     function restart() {
       clearInterval(timer);
-      if (playing) timer = setInterval(() => show(index + 1), 8000);
+      if (playing) timer = setInterval(() => show(index + 1), 30000);
     }
 
     document.querySelector('#prev').addEventListener('click', () => show(index - 1));

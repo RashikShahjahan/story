@@ -6,7 +6,7 @@ compatibility: opencode
 metadata:
   library: p5.js
   output: html
-  sound_tools: search-soundtracks, omnivoice-tts
+  sound_tools: search-soundtracks, kokoro-tts
 ---
 
 ## Purpose
@@ -23,7 +23,7 @@ Create a self-contained HTML file that loads p5.js from a CDN and contains the s
 Refer to the p5.js docs at https://p5js.org/reference/
 
 1. Infer the scene from the user’s prompt or story segment.
-2. If the scene includes story narration and no narration audio path has been provided, use the `omnivoice-tts` tool to generate a WAV file for the exact story text before creating the animation.
+2. If the scene includes story narration and no narration audio path has been provided, use the `kokoro-tts` tool to generate a WAV file for the exact story text before creating the animation.
 3. Use the `search-soundtracks` tool to find one relevant Openverse audio track for the scene mood, setting, or ambience when background audio improves the scene. Prefer playable `audio_url` results with clear Creative Commons attribution.
 4. Create or update the p5.js HTML animation file.
 5. Include narration audio when available. Keep playback controls hidden, start narration with the visuals, and make the animation continue silently if audio loading or playback fails.

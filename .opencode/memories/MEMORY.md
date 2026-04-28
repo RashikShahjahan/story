@@ -1,3 +1,1 @@
-OmniVoice TTS is configured to run under Python 3.13 because torch==2.8.0 has no CPython 3.14 wheel; dependency resolution and `omnivoice` import were verified with `uv run --python 3.13`.
-§
-OmniVoice TTS auto voice works for Bangla when `instruct` is left empty; a freeform `instruct` value can fail in `_resolve_instruct`.
+Kokoro TTS is configured via the local `kokoro-tts` OpenCode tool, running `hexgrad/Kokoro-82M` through `uv run --python 3.13` with `kokoro>=0.9.4`, `soundfile`, `numpy`, and the English spaCy model wheel.
