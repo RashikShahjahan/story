@@ -1,4 +1,4 @@
-from mlx_lm import load, generate
+from mlx_lm import load, stream_generate
 
 model, tokenizer = load("mlx-community/Qwen3.5-9B-OptiQ-4bit")
 
@@ -7,9 +7,9 @@ with open("PROMPT.md", "r") as f:
 
 user_input = input("Enter your request: ")
 
-response = generate(
+for chunk in stream_generate(
     model, tokenizer,
     prompt=prompt + "\n\nUser request: " + user_input,
-    max_tokens=200,
-)
-print(response)
+    max_tokens=128000,
+):
+    print(chunk.text, end="", flush=True)
