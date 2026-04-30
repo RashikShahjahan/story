@@ -23,8 +23,8 @@ def search_soundtracks(
     query = query.strip()
     if not query:
         raise ValueError("query is required")
-    count = min(10, max(1, int(count or 5)))
-    page = min(100, max(1, int(page or 1)))
+    count = min(10, max(1, int(count)))
+    page = min(100, max(1, int(page)))
     params = {"q": query, "page_size": str(count * 4 if minDurationSeconds or maxDurationSeconds else count), "page": str(page)}
     for key, value in {"category": category, "source": source, "license": license, "extension": extension}.items():
         if value:

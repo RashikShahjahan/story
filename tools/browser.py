@@ -9,7 +9,7 @@ from .common import WORKSPACE, json_result
 
 def show_in_browser(target: str | None = None, targets: list[str] | None = None, secondsPerAnimation: float = 8) -> str:
     """Open one local HTML file/URL, or show multiple local animation files as a slideshow."""
-    selected_targets = [item.strip() for item in (targets or []) if item.strip()]
+    selected_targets = [stripped for item in targets or [] if (stripped := item.strip())]
     if selected_targets:
         generated_dir = WORKSPACE / "animations"
         generated_dir.mkdir(parents=True, exist_ok=True)

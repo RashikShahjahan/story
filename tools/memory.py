@@ -126,8 +126,3 @@ def memory(action: str, target: str | None = None, content: str | None = None, o
         return json_result("Memory capacity would be exceeded.", {"success": False, "error": "capacity_exceeded"})
     _write_entries(parsed_target, next_entries)
     return success(next_entries, f"Replaced {parsed_target} memory.")
-
-
-def save_memory(action: str, target: str | None = None, content: str | None = None, old_text: str | None = None) -> str:
-    """Alias for the prompt's save-memory skill, backed by the memory tool."""
-    return memory(action=action, target=target, content=content, old_text=old_text)

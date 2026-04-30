@@ -5,25 +5,18 @@ from typing import Callable
 from .browser import show_in_browser
 from .common import json_result
 from .files import write_file
-from .memory import get_memories, memory, save_memory
+from .memory import get_memories, memory
 from .soundtracks import search_soundtracks
 from .tts import kokoro_tts
 
 
 TOOLS: dict[str, Callable[..., str]] = {
     "get-memories": get_memories,
-    "get_memories": get_memories,
     "write-file": write_file,
-    "write_file": write_file,
     "memory": memory,
-    "save-memory": save_memory,
-    "save_memory": save_memory,
     "kokoro-tts": kokoro_tts,
-    "kokoro_tts": kokoro_tts,
     "search-soundtracks": search_soundtracks,
-    "search_soundtracks": search_soundtracks,
     "show-in-browser": show_in_browser,
-    "show_in_browser": show_in_browser,
 }
 
 TOOL_SCHEMAS = [
@@ -49,23 +42,6 @@ TOOL_SCHEMAS = [
         "function": {
             "name": "memory",
             "description": memory.__doc__,
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "action": {"type": "string", "enum": ["add", "replace", "remove"]},
-                    "target": {"type": "string", "enum": ["memory", "user"]},
-                    "content": {"type": "string"},
-                    "old_text": {"type": "string"},
-                },
-                "required": ["action"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "save-memory",
-            "description": "Persist a concise durable memory, backed by the memory tool.",
             "parameters": {
                 "type": "object",
                 "properties": {
