@@ -9,5 +9,5 @@ WORKSPACE = Path(__file__).resolve().parent.parent
 ENTRY_SEPARATOR = "§"
 
 
-def json_result(output: str, metadata: dict[str, Any] | None = None) -> str:
-    return json.dumps({"output": output, "metadata": metadata if metadata is not None else {}}, ensure_ascii=False)
+def json_result(output: str, metadata: dict[str, Any] = {}) -> str:
+    return json.dumps({"output": output, "metadata": metadata}, ensure_ascii=False)

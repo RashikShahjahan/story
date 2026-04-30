@@ -21,12 +21,7 @@ def search_soundtracks(
 ) -> str:
     """Search Openverse audio for soundtrack and ambience tracks."""
     query = query.strip()
-    if not query:
-        raise ValueError("query is required")
-    count = min(10, max(1, int(count)))
-    page = min(100, max(1, int(page)))
-    has_duration_filter = minDurationSeconds is not None or maxDurationSeconds is not None
-    params = {"q": query, "page_size": str(count * 4 if has_duration_filter else count), "page": str(page)}
+    params = {"q": query, "page_size": str(count), "page": str(page)}
     for key, value in {"category": category, "source": source, "license": license, "extension": extension}.items():
         if value:
             params[key] = value.strip()
@@ -39,29 +34,26 @@ def search_soundtracks(
     for item in data["results"]:
         if item.get("mature") and not includeMature:
             continue
-        audio_url = (item.get("url") or "").strip()
-        if not audio_url:
-            continue
+        audio_url = item.get("url", "").strip()
         duration_ms = item.get("duration")
-        if minDurationSeconds is not None and (not isinstance(duration_ms, (int, float)) or duration_ms < minDurationSeconds * 1000):
+        if minDurationSeconds is not None and duration_ms < minDurationSeconds * 1000:
             continue
-        if maxDurationSeconds is not None and (not isinstance(duration_ms, (int, float)) or duration_ms > maxDurationSeconds * 1000):
+        if maxDurationSeconds is not None and duration_ms > maxDurationSeconds * 1000:
             continue
-        duration_seconds = round(duration_ms / 1000) if isinstance(duration_ms, (int, float)) else None
         results.append(
             {
-                "id": item.get("id", ""),
-                "title": item.get("title", ""),
-                "creator": item.get("creator", ""),
+                "id": item.get("id"),
+                "title": item.get("title"),
+                "creator": item.get("creator"),
                 "audio_url": audio_url,
-                "landing_url": item.get("foreign_landing_url", ""),
-                "license": item.get("license", ""),
-                "license_version": item.get("license_version", ""),
-                "license_url": item.get("license_url", ""),
-                "source": item.get("source", ""),
-                "filetype": item.get("filetype", ""),
-                "duration_seconds": duration_seconds,
-                "attribution": item.get("attribution", ""),
+                "landing_url": item.get("foreign_landing_url"),
+                "license": item.get("license"),
+                "license_version": item.get("license_version"),
+                "license_url": item.get("license_url"),
+                "source": item.get("source"),
+                "filetype": item.get("filetype"),
+                "duration_seconds": round(duration_ms / 1000) if duration_ms else None,
+                "attribution": item.get("attribution"),
             }
         )
         if len(results) >= count:
@@ -75,6 +67,4 @@ def search_soundtracks(
             f"Audio URL: {result['audio_url']}\nLanding URL: {result['landing_url']}\n"
             f"Attribution: {result['attribution']}"
         )
-    if not results:
-        lines.append("No usable audio URLs matched the query and filters. Try a broader query.")
     return json_result("\n\n".join(lines), {"query": query, "search_url": url, "results": results})

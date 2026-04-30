@@ -13,8 +13,7 @@ SAMPLE_RATE = 24_000
 
 
 def _safe_file_name(value: str) -> str:
-    name = re.sub(r"[^a-z0-9._-]+", "-", value.lower()).strip("-")[:80]
-    return name or "speech"
+    return re.sub(r"[^a-z0-9._-]+", "-", value.lower()).strip("-")[:80]
 
 
 def _resolve_output_path(output_path: str | None, text: str) -> Path:
@@ -51,16 +50,14 @@ def _as_audio_array(chunk):
 def kokoro_tts(
     text: str,
     outputPath: str | None = None,
-    voice: str | None = None,
-    langCode: str | None = None,
-    speed: float | None = None,
-    splitPattern: str | None = None,
-    device: str | None = None,
+    voice: str = DEFAULT_TTS_VOICE,
+    langCode: str = DEFAULT_LANG_CODE,
+    speed: float = 1.0,
+    splitPattern: str = r"\n+",
+    device: str = "auto",
 ) -> str:
     """Convert text to speech with Kokoro and save the generated audio as a WAV file."""
     text = text.strip()
-    if not text:
-        raise ValueError("text is required")
 
     import numpy as np
     import soundfile as sf
@@ -69,21 +66,15 @@ def kokoro_tts(
     output_path = _resolve_output_path(outputPath, text)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    voice_name = DEFAULT_TTS_VOICE if voice is None else voice.strip()
-    lang_code = DEFAULT_LANG_CODE if langCode is None else langCode.strip()
-    tts_speed = 1.0 if speed is None else speed
-    split_pattern = r"\n+" if splitPattern is None else splitPattern.strip()
-    device_name = _resolve_device("auto" if device is None else device.strip())
+    voice_name = voice.strip()
+    lang_code = langCode.strip()
+    split_pattern = splitPattern.strip()
+    device_name = _resolve_device(device.strip())
 
     pipeline = KPipeline(lang_code=lang_code, repo_id="hexgrad/Kokoro-82M", device=device_name)
     chunks = []
-    for _, _, chunk in pipeline(text, voice=voice_name, speed=tts_speed, split_pattern=split_pattern):
-        audio = _as_audio_array(chunk)
-        if audio.size:
-            chunks.append(audio)
-
-    if not chunks:
-        raise RuntimeError("Kokoro did not generate any audio")
+    for _, _, chunk in pipeline(text, voice=voice_name, speed=speed, split_pattern=split_pattern):
+        chunks.append(_as_audio_array(chunk))
 
     audio = np.concatenate(chunks)
     sf.write(output_path, audio, SAMPLE_RATE)
@@ -96,7 +87,7 @@ def kokoro_tts(
             "text": text,
             "voice": voice_name,
             "lang_code": lang_code,
-            "speed": tts_speed,
+            "speed": speed,
             "split_pattern": split_pattern,
             "device": device_name,
             "duration_seconds": duration_seconds,

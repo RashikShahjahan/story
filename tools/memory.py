@@ -16,13 +16,6 @@ def _memory_path(target: str):
     return MEMORY_DIR / MEMORY_TARGETS[target]["file"]
 
 
-def _parse_target(value: str | None) -> str:
-    target = "memory" if value is None else value.strip().lower()
-    if target not in MEMORY_TARGETS:
-        raise ValueError(f'target must be either "memory" or "user", got: {value}')
-    return target
-
-
 def _parse_entries(text: str) -> list[str]:
     return [entry.strip().replace("\r\n", "\n") for entry in re.split(rf"\s*{ENTRY_SEPARATOR}\s*", text) if entry.strip()]
 
@@ -60,26 +53,10 @@ def get_memories() -> str:
     return json_result("\n\n".join(stores))
 
 
-def _assert_safe_memory(content: str) -> None:
-    if ENTRY_SEPARATOR in content:
-        raise ValueError(f"memory content cannot contain the {ENTRY_SEPARATOR} delimiter")
-    blocked_patterns = [
-        r"ignore\s+(all\s+)?(previous|prior|above)\s+(instructions|system|developer)",
-        r"(reveal|print|dump|exfiltrate).{0,40}(system prompt|developer message|secrets?|credentials?)",
-        r"(?:password|token|secret|api[_ -]?key)\s*[:=]\s*[\"']?[A-Za-z0-9_./+=-]{12,}",
-        r"-----BEGIN [A-Z ]*PRIVATE KEY-----",
-    ]
-    if any(re.search(pattern, content, re.IGNORECASE) for pattern in blocked_patterns):
-        raise ValueError("memory content matched a blocked injection or secret pattern")
-
-
 def memory(action: str, target: str | None = None, content: str | None = None, old_text: str | None = None) -> str:
     """Manage bounded persistent memory stores with add, replace, and remove actions."""
     action = action.strip().lower()
-    if action not in {"add", "replace", "remove"}:
-        raise ValueError(f'action must be "add", "replace", or "remove", got: {action}')
-
-    parsed_target = _parse_target(target)
+    parsed_target = "memory" if target is None else target.strip().lower()
     entries = _read_entries(parsed_target)
 
     def success(next_entries: list[str], message: str) -> str:
@@ -89,37 +66,19 @@ def memory(action: str, target: str | None = None, content: str | None = None, o
         )
 
     if action == "add":
-        new_content = "" if content is None else content.strip()
-        if not new_content:
-            raise ValueError("content is required for add and replace actions")
-        _assert_safe_memory(new_content)
-        if new_content in entries:
-            return success(entries, f"Duplicate {parsed_target} memory not added.")
+        new_content = content.strip()
         next_entries = [*entries, new_content]
-        if _usage(parsed_target, next_entries)["used"] > MEMORY_TARGETS[parsed_target]["limit"]:
-            raise ValueError("memory capacity would be exceeded")
         _write_entries(parsed_target, next_entries)
         return success(next_entries, f"Added {parsed_target} memory.")
 
-    needle = "" if old_text is None else old_text.strip()
-    if not needle:
-        raise ValueError("old_text must not be empty")
-    matches = [(index, entry) for index, entry in enumerate(entries) if needle in entry]
-    if len(matches) != 1:
-        raise ValueError(f"expected exactly one {parsed_target} memory entry matching old_text; found {len(matches)}")
-
-    index, old_entry = matches[0]
+    needle = old_text.strip()
+    index, old_entry = next((index, entry) for index, entry in enumerate(entries) if needle in entry)
     if action == "remove":
         next_entries = [entry for entry_index, entry in enumerate(entries) if entry_index != index]
         _write_entries(parsed_target, next_entries)
         return success(next_entries, f"Removed {parsed_target} memory: {old_entry}")
 
-    new_content = "" if content is None else content.strip()
-    if not new_content:
-        raise ValueError("content is required for add and replace actions")
-    _assert_safe_memory(new_content)
+    new_content = content.strip()
     next_entries = [new_content if entry_index == index else entry for entry_index, entry in enumerate(entries)]
-    if _usage(parsed_target, next_entries)["used"] > MEMORY_TARGETS[parsed_target]["limit"]:
-        raise ValueError("memory capacity would be exceeded")
     _write_entries(parsed_target, next_entries)
     return success(next_entries, f"Replaced {parsed_target} memory.")

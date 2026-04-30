@@ -31,7 +31,7 @@ TOOL_SCHEMAS = [
     _tool_schema(
         "write-file",
         write_file.__doc__,
-        {"path": {"type": "string"}, "content": {"type": "string"}, "overwrite": {"type": "boolean"}},
+        {"path": {"type": "string"}, "content": {"type": "string"}},
         ["path", "content"],
     ),
     _tool_schema(

@@ -16,8 +16,6 @@ def show_in_browser(target: str | None = None, targets: list[str] | None = None,
         slides = []
         for index, item in enumerate(selected_targets):
             path = Path(item) if Path(item).is_absolute() else WORKSPACE / item
-            if not path.exists():
-                raise FileNotFoundError(f"File does not exist: {path}")
             slides.append(f'<section class="slide{" active" if index == 0 else ""}"><iframe src="{path.resolve().as_uri()}"></iframe></section>')
         preview = generated_dir / "story-animations.html"
         preview.write_text(
@@ -27,13 +25,10 @@ def show_in_browser(target: str | None = None, targets: list[str] | None = None,
         webbrowser.open(preview.resolve().as_uri())
         return json_result(f"Opened {len(selected_targets)} animations one by one in {preview}.", {"preview_path": str(preview)})
 
-    if target is None or not (item := target.strip()):
-        raise ValueError("target or targets is required")
+    item = target.strip()
     if re.match(r"^https?://", item, re.IGNORECASE):
         webbrowser.open(item)
         return json_result(f"Opened {item} in the browser.")
     path = Path(item) if Path(item).is_absolute() else WORKSPACE / item
-    if not path.exists():
-        raise FileNotFoundError(f"File does not exist: {path}")
     webbrowser.open(path.resolve().as_uri())
     return json_result(f"Opened {path} in the browser.", {"path": str(path)})
