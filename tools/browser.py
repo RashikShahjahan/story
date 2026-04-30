@@ -11,7 +11,7 @@ def show_in_browser(target: str | None = None, targets: list[str] | None = None,
     """Open one local HTML file/URL, or show multiple local animation files as a slideshow."""
     selected_targets = [item.strip() for item in (targets or []) if item.strip()]
     if selected_targets:
-        generated_dir = WORKSPACE / ".opencode" / "generated"
+        generated_dir = WORKSPACE / "animations"
         generated_dir.mkdir(parents=True, exist_ok=True)
         slides = []
         for index, item in enumerate(selected_targets):

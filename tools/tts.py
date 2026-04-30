@@ -1,11 +1,7 @@
 from __future__ import annotations
 
-import json
 import re
-import shutil
-import subprocess
 import time
-import wave
 from pathlib import Path
 
 from .common import WORKSPACE, json_result
@@ -31,14 +27,25 @@ def _resolve_output_path(output_path: str | None, text: str) -> Path:
     return WORKSPACE / ".opencode" / "generated" / "tts" / f"{stamp}-{preview}.wav"
 
 
-def _write_silent_wav(path: Path, duration_seconds: float = 0.25) -> None:
-    frames = int(SAMPLE_RATE * duration_seconds)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with wave.open(str(path), "wb") as wav:
-        wav.setnchannels(1)
-        wav.setsampwidth(2)
-        wav.setframerate(SAMPLE_RATE)
-        wav.writeframes(b"\x00\x00" * frames)
+def _resolve_device(device: str | None) -> str:
+    if device and device != "auto":
+        return device
+
+    import torch
+
+    if torch.cuda.is_available():
+        return "cuda"
+    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        return "mps"
+    return "cpu"
+
+
+def _as_audio_array(chunk):
+    import numpy as np
+
+    if hasattr(chunk, "detach"):
+        chunk = chunk.detach().cpu().numpy()
+    return np.asarray(chunk, dtype=np.float32).reshape(-1)
 
 
 def kokoro_tts(
@@ -55,88 +62,44 @@ def kokoro_tts(
     if not text:
         raise ValueError("text is required")
 
+    import numpy as np
+    import soundfile as sf
+    from kokoro import KPipeline
+
     output_path = _resolve_output_path(outputPath, text)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    runner_path = WORKSPACE / ".opencode" / "generated" / "tts" / "kokoro_tts_runner.py"
-    uv = shutil.which("uv")
-    if not uv:
-        _write_silent_wav(output_path)
-        return json_result(
-            f"uv was not found, so a silent placeholder WAV was created.\nFile: {output_path}",
-            {"output_path": str(output_path), "model": "placeholder", "sample_rate": SAMPLE_RATE},
-        )
 
-    runner_path.parent.mkdir(parents=True, exist_ok=True)
-    runner_path.write_text(
-        """
-import json
-import sys
+    voice_name = (voice or DEFAULT_TTS_VOICE).strip()
+    lang_code = (langCode or DEFAULT_LANG_CODE).strip()
+    tts_speed = speed if isinstance(speed, (int, float)) and speed > 0 else 1.0
+    split_pattern = (splitPattern or r"\n+").strip()
+    device_name = _resolve_device((device or "auto").strip())
 
-import numpy as np
-import soundfile as sf
-import torch
-from kokoro import KPipeline
+    pipeline = KPipeline(lang_code=lang_code, repo_id="hexgrad/Kokoro-82M", device=device_name)
+    chunks = []
+    for _, _, chunk in pipeline(text, voice=voice_name, speed=tts_speed, split_pattern=split_pattern):
+        audio = _as_audio_array(chunk)
+        if audio.size:
+            chunks.append(audio)
 
-SAMPLE_RATE = 24000
+    if not chunks:
+        raise RuntimeError("Kokoro did not generate any audio")
 
-def resolve_device(device):
-    if device and device != "auto":
-        return device
-    if torch.cuda.is_available():
-        return "cuda"
-    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-        return "mps"
-    return "cpu"
-
-payload = json.load(sys.stdin)
-pipeline = KPipeline(lang_code=payload["lang_code"], repo_id="hexgrad/Kokoro-82M", device=resolve_device(payload["device"]))
-chunks = []
-for _, _, chunk in pipeline(payload["text"], voice=payload["voice"], speed=payload["speed"], split_pattern=payload["split_pattern"]):
-    if hasattr(chunk, "detach"):
-        chunk = chunk.detach().cpu().numpy()
-    audio = np.asarray(chunk, dtype=np.float32).reshape(-1)
-    if audio.size:
-        chunks.append(audio)
-if not chunks:
-    raise RuntimeError("Kokoro did not generate any audio")
-audio = np.concatenate(chunks)
-sf.write(payload["output_path"], audio, SAMPLE_RATE)
-print(json.dumps({"duration_seconds": round(float(len(audio)) / SAMPLE_RATE, 3), "sample_rate": SAMPLE_RATE}))
-""".strip(),
-        encoding="utf-8",
-    )
-    payload = {
-        "text": text,
-        "output_path": str(output_path),
-        "voice": (voice or DEFAULT_TTS_VOICE).strip(),
-        "lang_code": (langCode or DEFAULT_LANG_CODE).strip(),
-        "speed": speed if isinstance(speed, (int, float)) and speed > 0 else 1.0,
-        "split_pattern": (splitPattern or r"\n+").strip(),
-        "device": (device or "auto").strip(),
-    }
-    command = [
-        uv,
-        "run",
-        "--python",
-        "3.13",
-        "--with",
-        "kokoro>=0.9.4",
-        "--with",
-        "soundfile",
-        "--with",
-        "numpy",
-        "--with",
-        "en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",
-        "python",
-        str(runner_path),
-    ]
-    completed = subprocess.run(command, cwd=WORKSPACE, input=json.dumps(payload), text=True, capture_output=True, check=False, timeout=600)
-    if completed.returncode != 0:
-        failure = (completed.stderr or completed.stdout).strip()[:1200]
-        raise RuntimeError(f"Kokoro TTS failed. {failure}")
-
-    result = json.loads(completed.stdout.strip().splitlines()[-1])
+    audio = np.concatenate(chunks)
+    sf.write(output_path, audio, SAMPLE_RATE)
+    duration_seconds = round(float(len(audio)) / SAMPLE_RATE, 3)
     return json_result(
-        f"Generated speech with hexgrad/Kokoro-82M ({payload['voice']}).\nFile: {output_path}\nDuration: {result.get('duration_seconds', 'unknown')} seconds at {result.get('sample_rate', SAMPLE_RATE)} Hz",
-        {"output_path": str(output_path), "model": "hexgrad/Kokoro-82M", **payload, **result},
+        f"Generated speech with hexgrad/Kokoro-82M ({voice_name}).\nFile: {output_path}\nDuration: {duration_seconds} seconds at {SAMPLE_RATE} Hz",
+        {
+            "output_path": str(output_path),
+            "model": "hexgrad/Kokoro-82M",
+            "text": text,
+            "voice": voice_name,
+            "lang_code": lang_code,
+            "speed": tts_speed,
+            "split_pattern": split_pattern,
+            "device": device_name,
+            "duration_seconds": duration_seconds,
+            "sample_rate": SAMPLE_RATE,
+        },
     )
