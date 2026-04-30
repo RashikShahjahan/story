@@ -10,4 +10,4 @@ ENTRY_SEPARATOR = "§"
 
 
 def json_result(output: str, metadata: dict[str, Any] | None = None) -> str:
-    return json.dumps({"output": output, "metadata": metadata or {}}, ensure_ascii=False)
+    return json.dumps({"output": output, "metadata": metadata if metadata is not None else {}}, ensure_ascii=False)

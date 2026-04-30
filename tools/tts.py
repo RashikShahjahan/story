@@ -18,24 +18,24 @@ def _safe_file_name(value: str) -> str:
 
 
 def _resolve_output_path(output_path: str | None, text: str) -> Path:
-    if output_path and output_path.strip():
+    if output_path is not None:
         path = Path(output_path.strip())
         resolved = path if path.is_absolute() else WORKSPACE / path
-        return resolved if resolved.suffix == ".wav" else resolved.with_suffix(".wav")
+        return resolved.with_suffix(".wav")
     stamp = time.strftime("%Y-%m-%dT%H-%M-%S")
     preview = _safe_file_name(text[:48])
     return WORKSPACE / ".opencode" / "generated" / "tts" / f"{stamp}-{preview}.wav"
 
 
-def _resolve_device(device: str | None) -> str:
-    if device and device != "auto":
+def _resolve_device(device: str) -> str:
+    if device != "auto":
         return device
 
     import torch
 
     if torch.cuda.is_available():
         return "cuda"
-    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+    if torch.backends.mps.is_available():
         return "mps"
     return "cpu"
 
@@ -69,11 +69,11 @@ def kokoro_tts(
     output_path = _resolve_output_path(outputPath, text)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    voice_name = (voice or DEFAULT_TTS_VOICE).strip()
-    lang_code = (langCode or DEFAULT_LANG_CODE).strip()
-    tts_speed = speed if isinstance(speed, (int, float)) and speed > 0 else 1.0
-    split_pattern = (splitPattern or r"\n+").strip()
-    device_name = _resolve_device((device or "auto").strip())
+    voice_name = DEFAULT_TTS_VOICE if voice is None else voice.strip()
+    lang_code = DEFAULT_LANG_CODE if langCode is None else langCode.strip()
+    tts_speed = 1.0 if speed is None else speed
+    split_pattern = r"\n+" if splitPattern is None else splitPattern.strip()
+    device_name = _resolve_device("auto" if device is None else device.strip())
 
     pipeline = KPipeline(lang_code=lang_code, repo_id="hexgrad/Kokoro-82M", device=device_name)
     chunks = []

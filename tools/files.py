@@ -10,12 +10,9 @@ def _resolve_workspace_path(path: str) -> Path:
     if not raw_path:
         raise ValueError("path is required")
     candidate = Path(raw_path)
-    resolved = candidate.resolve() if candidate.is_absolute() else (WORKSPACE / candidate).resolve()
-    workspace = WORKSPACE.resolve()
-    try:
-        resolved.relative_to(workspace)
-    except ValueError as exc:
-        raise ValueError(f"path must be inside the workspace: {path}") from exc
+    resolved = (candidate if candidate.is_absolute() else WORKSPACE / candidate).resolve()
+    if not resolved.is_relative_to(WORKSPACE.resolve()):
+        raise ValueError(f"path must be inside the workspace: {path}")
     return resolved
 
 

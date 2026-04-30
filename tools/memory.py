@@ -17,7 +17,7 @@ def _memory_path(target: str):
 
 
 def _parse_target(value: str | None) -> str:
-    target = (value or "memory").strip().lower()
+    target = "memory" if value is None else value.strip().lower()
     if target not in MEMORY_TARGETS:
         raise ValueError(f'target must be either "memory" or "user", got: {value}')
     return target
@@ -89,7 +89,7 @@ def memory(action: str, target: str | None = None, content: str | None = None, o
         )
 
     if action == "add":
-        new_content = (content or "").strip()
+        new_content = "" if content is None else content.strip()
         if not new_content:
             raise ValueError("content is required for add and replace actions")
         _assert_safe_memory(new_content)
@@ -97,19 +97,16 @@ def memory(action: str, target: str | None = None, content: str | None = None, o
             return success(entries, f"Duplicate {parsed_target} memory not added.")
         next_entries = [*entries, new_content]
         if _usage(parsed_target, next_entries)["used"] > MEMORY_TARGETS[parsed_target]["limit"]:
-            return json_result("Memory capacity would be exceeded.", {"success": False, "error": "capacity_exceeded"})
+            raise ValueError("memory capacity would be exceeded")
         _write_entries(parsed_target, next_entries)
         return success(next_entries, f"Added {parsed_target} memory.")
 
-    needle = (old_text or "").strip()
+    needle = "" if old_text is None else old_text.strip()
     if not needle:
         raise ValueError("old_text must not be empty")
     matches = [(index, entry) for index, entry in enumerate(entries) if needle in entry]
     if len(matches) != 1:
-        return json_result(
-            f"Expected exactly one {parsed_target} memory entry matching old_text; found {len(matches)}.",
-            {"success": False, "error": "not_found" if not matches else "ambiguous_match", "current_entries": entries},
-        )
+        raise ValueError(f"expected exactly one {parsed_target} memory entry matching old_text; found {len(matches)}")
 
     index, old_entry = matches[0]
     if action == "remove":
@@ -117,12 +114,12 @@ def memory(action: str, target: str | None = None, content: str | None = None, o
         _write_entries(parsed_target, next_entries)
         return success(next_entries, f"Removed {parsed_target} memory: {old_entry}")
 
-    new_content = (content or "").strip()
+    new_content = "" if content is None else content.strip()
     if not new_content:
         raise ValueError("content is required for add and replace actions")
     _assert_safe_memory(new_content)
     next_entries = [new_content if entry_index == index else entry for entry_index, entry in enumerate(entries)]
     if _usage(parsed_target, next_entries)["used"] > MEMORY_TARGETS[parsed_target]["limit"]:
-        return json_result("Memory capacity would be exceeded.", {"success": False, "error": "capacity_exceeded"})
+        raise ValueError("memory capacity would be exceeded")
     _write_entries(parsed_target, next_entries)
     return success(next_entries, f"Replaced {parsed_target} memory.")
