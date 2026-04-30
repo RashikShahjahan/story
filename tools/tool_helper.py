@@ -14,9 +14,10 @@ def _suffix_prefix_len(text: str, marker: str) -> int:
 
 
 class ToolCallCapture:
-    def __init__(self, start_marker: str, end_marker: str):
+    def __init__(self, start_marker: str, end_marker: str, hide_tool_calls: bool = False):
         self.start_marker = start_marker
         self.end_marker = end_marker
+        self.hide_tool_calls = hide_tool_calls
         self.visible_parts: list[str] = []
         self.tool_texts: list[str] = []
         self._buffer = ""
@@ -33,9 +34,11 @@ class ToolCallCapture:
                 index = self._buffer.find(self.start_marker)
                 if index >= 0:
                     visible = self._buffer[:index]
-                    if not self._saw_tool_call:
+                    if not self._saw_tool_call or not self.hide_tool_calls:
                         visible_parts.append(visible)
                         self.visible_parts.append(visible)
+                    if not self.hide_tool_calls:
+                        visible_parts.append(self.start_marker)
                     self._buffer = self._buffer[index + len(self.start_marker) :]
                     self._state = "tool"
                     self._saw_tool_call = True
@@ -43,7 +46,7 @@ class ToolCallCapture:
 
                 keep = _suffix_prefix_len(self._buffer, self.start_marker)
                 visible = self._buffer[:-keep] if keep else self._buffer
-                if visible and not self._saw_tool_call:
+                if visible and (not self._saw_tool_call or not self.hide_tool_calls):
                     visible_parts.append(visible)
                     self.visible_parts.append(visible)
                 self._buffer = self._buffer[-keep:] if keep else ""
@@ -51,7 +54,10 @@ class ToolCallCapture:
 
             index = self._buffer.find(self.end_marker)
             if index >= 0:
-                self._tool_parts.append(self._buffer[:index])
+                tool_text = self._buffer[:index]
+                self._tool_parts.append(tool_text)
+                if not self.hide_tool_calls:
+                    visible_parts.append(tool_text + self.end_marker)
                 self.tool_texts.append("".join(self._tool_parts))
                 self._tool_parts = []
                 self._buffer = self._buffer[index + len(self.end_marker) :]
@@ -59,7 +65,10 @@ class ToolCallCapture:
                 continue
 
             keep = _suffix_prefix_len(self._buffer, self.end_marker)
-            self._tool_parts.append(self._buffer[:-keep] if keep else self._buffer)
+            tool_text = self._buffer[:-keep] if keep else self._buffer
+            self._tool_parts.append(tool_text)
+            if tool_text and not self.hide_tool_calls:
+                visible_parts.append(tool_text)
             self._buffer = self._buffer[-keep:] if keep else ""
             break
 
@@ -67,15 +76,16 @@ class ToolCallCapture:
 
     def finish(self) -> str:
         if self._state == "tool":
+            visible = self._buffer if not self.hide_tool_calls else ""
             self._tool_parts.append(self._buffer)
             tool_text = "".join(self._tool_parts)
             if tool_text.strip():
                 self.tool_texts.append(tool_text)
             self._buffer = ""
             self._tool_parts = []
-            return ""
+            return visible
 
-        visible = self._buffer if not self._saw_tool_call else ""
+        visible = self._buffer if not self._saw_tool_call or not self.hide_tool_calls else ""
         self.visible_parts.append(visible)
         self._buffer = ""
         return visible
