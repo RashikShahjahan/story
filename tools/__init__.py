@@ -4,6 +4,7 @@ from typing import Callable
 
 from .browser import show_in_browser
 from .common import json_result
+from .files import write_file
 from .memory import get_memories, memory, save_memory
 from .soundtracks import search_soundtracks
 from .tts import kokoro_tts
@@ -12,6 +13,8 @@ from .tts import kokoro_tts
 TOOLS: dict[str, Callable[..., str]] = {
     "get-memories": get_memories,
     "get_memories": get_memories,
+    "write-file": write_file,
+    "write_file": write_file,
     "memory": memory,
     "save-memory": save_memory,
     "save_memory": save_memory,
@@ -25,6 +28,22 @@ TOOLS: dict[str, Callable[..., str]] = {
 
 TOOL_SCHEMAS = [
     {"type": "function", "function": {"name": "get-memories", "description": get_memories.__doc__, "parameters": {"type": "object", "properties": {}}}},
+    {
+        "type": "function",
+        "function": {
+            "name": "write-file",
+            "description": write_file.__doc__,
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string"},
+                    "content": {"type": "string"},
+                    "overwrite": {"type": "boolean"},
+                },
+                "required": ["path", "content"],
+            },
+        },
+    },
     {
         "type": "function",
         "function": {

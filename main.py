@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import html
 import json
 import re
 import sys
@@ -21,6 +22,8 @@ def _tool_prompt() -> str:
     return (
         "\n\nYou can call tools by outputting one or more blocks exactly like this:\n"
         "<tool_call>{\"name\": \"tool-name\", \"arguments\": {}}</tool_call>\n"
+        "If your chat template emits XML-style function calls, this is also supported:\n"
+        "<tool_call><function=tool-name><parameter=arg>value</parameter></function></tool_call>\n"
         "Available tools:\n"
         + json.dumps(TOOL_SCHEMAS, ensure_ascii=False, indent=2)
     )
@@ -41,9 +44,32 @@ def _render_prompt(messages: list[dict[str, str]], tokenizer: Any) -> str:
 
 def _extract_tool_calls(text: str) -> list[dict[str, Any]]:
     calls = []
-    for match in re.finditer(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", text, re.DOTALL):
-        calls.append(json.loads(match.group(1)))
+    for match in re.finditer(r"<tool_call>\s*(.*?)\s*</tool_call>", text, re.DOTALL):
+        block = match.group(1).strip()
+        if not block:
+            continue
+        if block.startswith("{"):
+            calls.append(json.loads(block))
+            continue
+        for function_match in re.finditer(r"<function=([\w.-]+)>\s*(.*?)\s*</function>", block, re.DOTALL):
+            arguments = {}
+            body = function_match.group(2)
+            for parameter_match in re.finditer(r"<parameter=([\w.-]+)>\s*(.*?)\s*</parameter>", body, re.DOTALL):
+                raw_value = html.unescape(parameter_match.group(2)).strip()
+                arguments[parameter_match.group(1)] = _parse_tool_argument(raw_value)
+            calls.append({"name": function_match.group(1), "arguments": arguments})
     return calls
+
+
+def _parse_tool_argument(value: str) -> Any:
+    if not value:
+        return value
+    if value in {"true", "false", "null"} or value[:1] in {'"', "[", "{"}:
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError:
+            return value
+    return value
 
 
 def _call_tool(call: dict[str, Any]) -> str:
@@ -68,6 +94,13 @@ def _generate_response(model: Any, tokenizer: Any, prompt: str, max_tokens: int,
     return "".join(chunks)
 
 
+def _clean_response(text: str) -> str:
+    cleaned = re.sub(r"<\|im_(?:start|end)\|>", "", text).strip()
+    if "</think>" in cleaned:
+        cleaned = cleaned.rsplit("</think>", 1)[1].strip()
+    return cleaned
+
+
 def run_agent(user_prompt: str, max_tokens: int, max_tool_rounds: int, stream: bool = False) -> str:
     model, tokenizer = load(MODEL_ID)
     system_prompt = PROMPT_PATH.read_text(encoding="utf-8") + _tool_prompt()
@@ -76,22 +109,26 @@ def run_agent(user_prompt: str, max_tokens: int, max_tool_rounds: int, stream: b
     final_response = ""
     for _ in range(max_tool_rounds + 1):
         prompt = _render_prompt(messages, tokenizer)
-        response = _generate_response(model, tokenizer, prompt, max_tokens, stream)
-        final_response = response.strip()
-        tool_calls = _extract_tool_calls(final_response)
+        response = _generate_response(model, tokenizer, prompt, max_tokens, stream=False)
+        final_response = _clean_response(response)
+        tool_calls = _extract_tool_calls(response)
         if not tool_calls:
+            if stream:
+                print(final_response, end="", flush=True)
             return final_response
-        messages.append({"role": "assistant", "content": final_response})
+        messages.append({"role": "assistant", "content": response.strip()})
         for call in tool_calls:
             result = _call_tool(call)
             messages.append({"role": "tool", "content": result})
+    if stream:
+        print(final_response, end="", flush=True)
     return final_response
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run the story animation model with PROMPT.md tools.")
     parser.add_argument("prompt", nargs="*", help="User request. If omitted, stdin is used.")
-    parser.add_argument("--max-tokens", type=int, default=4096)
+    parser.add_argument("--max-tokens", type=int, default=32768)
     parser.add_argument("--max-tool-rounds", type=int, default=6)
     args = parser.parse_args()
 
