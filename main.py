@@ -10,6 +10,7 @@ from mlx_lm.utils import _download, load_model, load_tokenizer
 
 from tools import TOOL_SCHEMAS
 from tools.tool_helper import (
+    HiddenSpanCapture,
     ToolCallCapture,
     execute_tool_call,
     parse_tool_calls,
@@ -49,7 +50,8 @@ def stream_events(
     messages: list[dict[str, Any]],
 ) -> Iterator[dict[str, Any]]:
     for _ in range(MAX_TOOL_ROUNDS + 1):
-        stream = ToolCallCapture(tokenizer.tool_call_start, tokenizer.tool_call_end)
+        thought_stream = HiddenSpanCapture("<|channel>thought", "<channel|>")
+        stream = ToolCallCapture(tokenizer.tool_call_start, tokenizer.tool_call_end, hide_tool_calls=True)
         prompt = _prompt_for(messages, tokenizer)
 
         for chunk in stream_generate(
@@ -58,11 +60,11 @@ def stream_events(
             prompt=prompt,
             max_tokens=MAX_TOKENS,
         ):
-            visible = stream.push(chunk.text)
+            visible = stream.push(thought_stream.push(chunk.text))
             if visible:
                 yield {"type": "text_delta", "text": visible}
 
-        visible = stream.finish()
+        visible = stream.push(thought_stream.finish()) + stream.finish()
         if visible:
             yield {"type": "text_delta", "text": visible}
 

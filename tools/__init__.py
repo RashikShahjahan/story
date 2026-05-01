@@ -6,11 +6,13 @@ from .browser.browser import show_in_browser
 from .files.files import write_file
 from .memory.memory import get_memories, memory
 from .soundtracks.soundtracks import search_soundtracks
+from .storyteller.storyteller import story_teller
 from .tts.tts import kokoro_tts
 
 
 TOOLS: dict[str, Callable[..., str]] = {
     "get-memories": get_memories,
+    "story-teller": story_teller,
     "write-file": write_file,
     "memory": memory,
     "kokoro-tts": kokoro_tts,
@@ -28,6 +30,12 @@ def _tool_schema(name: str, description: str | None, properties: dict[str, objec
 
 TOOL_SCHEMAS = [
     _tool_schema("get-memories", get_memories.__doc__, {}),
+    _tool_schema(
+        "story-teller",
+        story_teller.__doc__,
+        {"prompt": {"type": "string"}},
+        ["prompt"],
+    ),
     _tool_schema(
         "write-file",
         write_file.__doc__,
