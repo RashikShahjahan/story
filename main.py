@@ -23,7 +23,7 @@ MAX_TOOL_ROUNDS = 16
 WORKSPACE = Path(__file__).resolve().parent
 
 
-def _load_model_and_tokenizer(model_name: str) -> tuple[Any, Any]:
+def load_model_and_tokenizer(model_name: str) -> tuple[Any, Any]:
     model_path = _download(model_name)
     # Gemma4 shared-KV checkpoints include unused K/V tensors for shared layers.
     model, config = load_model(model_path, strict=False)
@@ -95,7 +95,7 @@ def stream_events(
     raise RuntimeError(f"stopped after {MAX_TOOL_ROUNDS} tool rounds")
 
 
-def _render_events(events: Iterable[dict[str, Any]]) -> None:
+def render_events(events: Iterable[dict[str, Any]]) -> None:
     needs_newline = False
     for event in events:
         if event["type"] == "text_delta":
@@ -113,14 +113,14 @@ def _render_events(events: Iterable[dict[str, Any]]) -> None:
 
 
 def main() -> None:
-    model, tokenizer = _load_model_and_tokenizer(MODEL_NAME)
+    model, tokenizer = load_model_and_tokenizer(MODEL_NAME)
     user_input = input("Enter your request: ")
     messages: list[dict[str, Any]] = [
         {"role": "system", "content": _load_system_prompt()},
         {"role": "user", "content": user_input},
     ]
 
-    _render_events(stream_events(model, tokenizer, messages))
+    render_events(stream_events(model, tokenizer, messages))
 
 
 if __name__ == "__main__":
