@@ -9,6 +9,7 @@ from .scriptwriter.scriptwriter import script_writer
 from .soundtracks.soundtracks import search_soundtracks
 from .storyteller.storyteller import story_teller
 from .tts.tts import kokoro_tts
+from .webfetch.webfetch import webfetch
 
 
 TOOLS: dict[str, Callable[..., str]] = {
@@ -19,6 +20,7 @@ TOOLS: dict[str, Callable[..., str]] = {
     "kokoro-tts": kokoro_tts,
     "search-soundtracks": search_soundtracks,
     "show-in-browser": show_in_browser,
+    "webfetch": webfetch,
 }
 
 
@@ -93,6 +95,16 @@ TOOL_SCHEMAS = [
         "show-in-browser",
         show_in_browser.__doc__,
         {"target": {"type": "string"}, "targets": {"type": "array", "items": {"type": "string"}}, "secondsPerAnimation": {"type": "number"}},
+    ),
+    _tool_schema(
+        "webfetch",
+        webfetch.__doc__,
+        {
+            "url": {"type": "string"},
+            "format": {"type": "string", "enum": ["markdown", "text", "html"]},
+            "timeout": {"type": "integer"},
+        },
+        ["url"],
     ),
 ]
 
