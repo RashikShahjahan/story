@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from .common import ENTRY_SEPARATOR, WORKSPACE, json_result
+from ..common import ENTRY_SEPARATOR, WORKSPACE, json_result
 
 
 MEMORY_DIR = WORKSPACE / ".opencode" / "memories"

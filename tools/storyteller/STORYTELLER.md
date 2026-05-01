@@ -1,0 +1,1 @@
+Write a story between 350 to 500 words. Make it engaging and internally consistant. Make sure to follow any guidance in the users request. 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .common import WORKSPACE, json_result
+from ..common import WORKSPACE, json_result
 
 
 def write_file(path: str, content: str) -> str:

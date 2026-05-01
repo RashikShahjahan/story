@@ -4,7 +4,7 @@ import json
 import urllib.parse
 import urllib.request
 
-from .common import json_result
+from ..common import json_result
 
 
 def search_soundtracks(

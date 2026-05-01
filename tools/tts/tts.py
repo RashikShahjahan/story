@@ -4,7 +4,7 @@ import re
 import time
 from pathlib import Path
 
-from .common import WORKSPACE, json_result
+from ..common import WORKSPACE, json_result
 
 
 DEFAULT_TTS_VOICE = "af_heart"

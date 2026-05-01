@@ -3,10 +3,10 @@ from __future__ import annotations
 from typing import Callable
 
 from .browser import show_in_browser
-from .files import write_file
-from .memory import get_memories, memory
-from .soundtracks import search_soundtracks
-from .tts import kokoro_tts
+from .files.files import write_file
+from .memory.memory import get_memories, memory
+from .soundtrack.soundtracks import search_soundtracks
+from .tts.tts import kokoro_tts
 
 
 TOOLS: dict[str, Callable[..., str]] = {
