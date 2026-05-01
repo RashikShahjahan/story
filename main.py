@@ -18,7 +18,7 @@ from tools.tool_helper import (
 )
 
 
-MODEL_NAME = "mlx-community/gemma-4-e2b-it-OptiQ-4bit"
+MODEL_NAME = "mlx-community/gemma-4-e4b-it-OptiQ-4bit"
 MAX_TOKENS = 128_000
 MAX_TOOL_ROUNDS = 16
 WORKSPACE = Path(__file__).resolve().parent

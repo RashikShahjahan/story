@@ -27,18 +27,35 @@ def _safe_file_name(value: str) -> str:
 
 
 def _resolve_output_path(output_path: str | None, title: str | None, script: str) -> Path:
+    animations_dir = WORKSPACE / "animations"
     if output_path is not None and output_path.strip():
-        path = Path(output_path.strip())
-        target = path if path.is_absolute() else WORKSPACE / path
+        path = Path(output_path.strip()).expanduser()
+        if path.is_absolute():
+            target = path if path.is_relative_to(animations_dir) else animations_dir / path.name
+        elif path.parts and path.parts[0] == "animations":
+            target = WORKSPACE / path
+        else:
+            target = animations_dir / path
     else:
         source = title.strip() if title and title.strip() else script[:48]
-        target = WORKSPACE / "animations" / f"{_safe_file_name(source)}.html"
+        target = animations_dir / f"{_safe_file_name(source)}.html"
     return target.with_suffix(".html")
 
 
 def _strip_code_fence(text: str) -> str:
-    match = re.fullmatch(r"\s*```(?:html)?\s*(.*?)\s*```\s*", text, re.DOTALL | re.IGNORECASE)
+    match = re.search(r"```(?:html)?\s*(.*?)\s*```", text, re.DOTALL | re.IGNORECASE)
     return match.group(1).strip() if match else text.strip()
+
+
+def _strip_thinking(text: str) -> str:
+    text = re.sub(r"<think\b[^>]*>.*?</think>\s*", "", text, flags=re.DOTALL | re.IGNORECASE)
+    return re.sub(r"^\s*.*?</think>\s*", "", text, count=1, flags=re.DOTALL | re.IGNORECASE).strip()
+
+
+def _clean_html_response(text: str) -> str:
+    html = _strip_code_fence(_strip_thinking(text))
+    html_start = re.search(r"<!doctype\s+html\b|<html\b", html, re.IGNORECASE)
+    return html[html_start.start() :].strip() if html_start else html
 
 
 def animator(script: str, title: str | None = None, outputPath: str | None = None) -> str:
@@ -60,7 +77,7 @@ def animator(script: str, title: str | None = None, outputPath: str | None = Non
         {"role": "user", "content": f"{title_line}Script or scene description:\n{script.strip()}"},
     ]
     chat_prompt = tokenizer.apply_chat_template(messages, add_generation_prompt=True)
-    html = _strip_code_fence(
+    html = _clean_html_response(
         "".join(
             chunk.text
             for chunk in stream_generate(
