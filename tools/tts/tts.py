@@ -9,6 +9,7 @@ from ..common import WORKSPACE, json_result
 
 DEFAULT_TTS_VOICE = "af_heart"
 DEFAULT_LANG_CODE = "a"
+MODEL_NAME = "mlx-community/Kokoro-82M-bf16"
 SAMPLE_RATE = 24_000
 
 
@@ -26,24 +27,9 @@ def _resolve_output_path(output_path: str | None, text: str) -> Path:
     return WORKSPACE / ".opencode" / "generated" / "tts" / f"{stamp}-{preview}.wav"
 
 
-def _resolve_device(device: str) -> str:
-    if device != "auto":
-        return device
-
-    import torch
-
-    if torch.cuda.is_available():
-        return "cuda"
-    if torch.backends.mps.is_available():
-        return "mps"
-    return "cpu"
-
-
 def _as_audio_array(chunk):
     import numpy as np
 
-    if hasattr(chunk, "detach"):
-        chunk = chunk.detach().cpu().numpy()
     return np.asarray(chunk, dtype=np.float32).reshape(-1)
 
 
@@ -56,12 +42,12 @@ def kokoro_tts(
     splitPattern: str = r"\n+",
     device: str = "auto",
 ) -> str:
-    """Convert text to speech with Kokoro and save the generated audio as a WAV file."""
+    """Convert text to speech with MLX-Audio Kokoro and save the generated audio as a WAV file."""
     text = text.strip()
 
     import numpy as np
     import soundfile as sf
-    from kokoro import KPipeline
+    from mlx_audio.tts.utils import load_model
 
     output_path = _resolve_output_path(outputPath, text)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -69,28 +55,31 @@ def kokoro_tts(
     voice_name = voice.strip()
     lang_code = langCode.strip()
     split_pattern = splitPattern.strip()
-    device_name = _resolve_device(device.strip())
 
-    pipeline = KPipeline(lang_code=lang_code, repo_id="hexgrad/Kokoro-82M", device=device_name)
+    model = load_model(MODEL_NAME)
     chunks = []
-    for _, _, chunk in pipeline(text, voice=voice_name, speed=speed, split_pattern=split_pattern):
-        chunks.append(_as_audio_array(chunk))
+    for result in model.generate(text=text, voice=voice_name, speed=speed, lang_code=lang_code):
+        chunks.append(_as_audio_array(result.audio))
+
+    if not chunks:
+        raise RuntimeError("MLX-Audio Kokoro did not return any audio chunks.")
 
     audio = np.concatenate(chunks)
-    sf.write(output_path, audio, SAMPLE_RATE)
-    duration_seconds = round(float(len(audio)) / SAMPLE_RATE, 3)
+    sample_rate = int(getattr(model, "sample_rate", SAMPLE_RATE) or SAMPLE_RATE)
+    sf.write(output_path, audio, sample_rate)
+    duration_seconds = round(float(len(audio)) / sample_rate, 3)
     return json_result(
-        f"Generated speech with hexgrad/Kokoro-82M ({voice_name}).\nFile: {output_path}\nDuration: {duration_seconds} seconds at {SAMPLE_RATE} Hz",
+        f"Generated speech with {MODEL_NAME} ({voice_name}).\nFile: {output_path}\nDuration: {duration_seconds} seconds at {sample_rate} Hz",
         {
             "output_path": str(output_path),
-            "model": "hexgrad/Kokoro-82M",
+            "model": MODEL_NAME,
             "text": text,
             "voice": voice_name,
             "lang_code": lang_code,
             "speed": speed,
             "split_pattern": split_pattern,
-            "device": device_name,
+            "device": "mlx",
             "duration_seconds": duration_seconds,
-            "sample_rate": SAMPLE_RATE,
+            "sample_rate": sample_rate,
         },
     )
