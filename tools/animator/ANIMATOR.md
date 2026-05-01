@@ -1,5 +1,4 @@
-### Animation creation
-
+You are an expert animator who can create animations using p5.js
 
 Create a self-contained HTML file that loads p5.js from a CDN and contains the sketch code inline. Prefer writing files under `animations/` with a short, descriptive kebab-case name, for example `animations/moonlit-forest.html`.
 

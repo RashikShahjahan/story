@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Callable
 
+from .animator.animator import animator
 from .browser.browser import show_in_browser
 from .files.files import write_file
-from .memory.memory import get_memories, memory
 from .scriptwriter.scriptwriter import script_writer
 from .soundtracks.soundtracks import search_soundtracks
 from .storyteller.storyteller import story_teller
@@ -12,11 +12,10 @@ from .tts.tts import kokoro_tts
 
 
 TOOLS: dict[str, Callable[..., str]] = {
-    "get-memories": get_memories,
     "story-teller": story_teller,
     "script-writer": script_writer,
+    "animator": animator,
     "write-file": write_file,
-    "memory": memory,
     "kokoro-tts": kokoro_tts,
     "search-soundtracks": search_soundtracks,
     "show-in-browser": show_in_browser,
@@ -31,7 +30,6 @@ def _tool_schema(name: str, description: str | None, properties: dict[str, objec
 
 
 TOOL_SCHEMAS = [
-    _tool_schema("get-memories", get_memories.__doc__, {}),
     _tool_schema(
         "story-teller",
         story_teller.__doc__,
@@ -45,21 +43,20 @@ TOOL_SCHEMAS = [
         ["story"],
     ),
     _tool_schema(
+        "animator",
+        animator.__doc__,
+        {
+            "script": {"type": "string"},
+            "title": {"type": "string"},
+            "outputPath": {"type": "string"},
+        },
+        ["script"],
+    ),
+    _tool_schema(
         "write-file",
         write_file.__doc__,
         {"path": {"type": "string"}, "content": {"type": "string"}},
         ["path", "content"],
-    ),
-    _tool_schema(
-        "memory",
-        memory.__doc__,
-        {
-            "action": {"type": "string", "enum": ["add", "replace", "remove"]},
-            "target": {"type": "string", "enum": ["memory", "user"]},
-            "content": {"type": "string"},
-            "old_text": {"type": "string"},
-        },
-        ["action"],
     ),
     _tool_schema(
         "kokoro-tts",
