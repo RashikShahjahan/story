@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from typing import Callable
 
-from .browser import show_in_browser
+from .browser.browser import show_in_browser
 from .files.files import write_file
 from .memory.memory import get_memories, memory
-from .soundtrack.soundtracks import search_soundtracks
+from .soundtracks.soundtracks import search_soundtracks
 from .tts.tts import kokoro_tts
 
 

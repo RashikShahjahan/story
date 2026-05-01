@@ -4,7 +4,7 @@ import re
 import webbrowser
 from pathlib import Path
 
-from .common import WORKSPACE, json_result
+from ..common import WORKSPACE, json_result
 
 
 def show_in_browser(target: str | None = None, targets: list[str] | None = None, secondsPerAnimation: float = 8) -> str:
