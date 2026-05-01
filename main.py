@@ -5,7 +5,8 @@ from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any
 
-from mlx_lm import load, stream_generate
+from mlx_lm import stream_generate
+from mlx_lm.utils import _download, load_model, load_tokenizer
 
 from tools import TOOL_SCHEMAS
 from tools.tool_helper import (
@@ -16,14 +17,22 @@ from tools.tool_helper import (
 )
 
 
-MODEL_NAME = "mlx-community/Qwen3.5-9B-OptiQ-4bit"
+MODEL_NAME = "mlx-community/gemma-4-e2b-it-OptiQ-4bit"
 MAX_TOKENS = 128_000
 MAX_TOOL_ROUNDS = 16
 WORKSPACE = Path(__file__).resolve().parent
 
 
+def _load_model_and_tokenizer(model_name: str) -> tuple[Any, Any]:
+    model_path = _download(model_name)
+    # Gemma4 shared-KV checkpoints include unused K/V tensors for shared layers.
+    model, config = load_model(model_path, strict=False)
+    tokenizer = load_tokenizer(model_path, eos_token_ids=config.get("eos_token_id"))
+    return model, tokenizer
+
+
 def _load_system_prompt() -> str:
-    return (WORKSPACE / "ORCHESTRATOR.md").read_text(encoding="utf-8")
+    return (WORKSPACE / "DIRECTOR.md").read_text(encoding="utf-8")
 
 
 def _prompt_for(messages: list[dict[str, Any]], tokenizer: Any) -> str | list[int]:
@@ -104,7 +113,7 @@ def _render_events(events: Iterable[dict[str, Any]]) -> None:
 
 
 def main() -> None:
-    model, tokenizer = load(MODEL_NAME)
+    model, tokenizer = _load_model_and_tokenizer(MODEL_NAME)
     user_input = input("Enter your request: ")
     messages: list[dict[str, Any]] = [
         {"role": "system", "content": _load_system_prompt()},
