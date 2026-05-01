@@ -23,7 +23,7 @@ WORKSPACE = Path(__file__).resolve().parent
 
 
 def _load_system_prompt() -> str:
-    return (WORKSPACE / "PROMPT.md").read_text(encoding="utf-8")
+    return (WORKSPACE / "ORCHESTRATOR.md").read_text(encoding="utf-8")
 
 
 def _prompt_for(messages: list[dict[str, Any]], tokenizer: Any) -> str | list[int]:
