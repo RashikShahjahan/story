@@ -1,100 +1,124 @@
 from __future__ import annotations
 
+import json
+import re
 import sys
 from collections.abc import Iterable, Iterator
-from pathlib import Path
 from typing import Any
 
-from mlx_lm import stream_generate
-from mlx_lm.utils import _download, load_model, load_tokenizer
-
-from tools import TOOL_SCHEMAS
-from tools.tool_helper import (
-    HiddenSpanCapture,
-    ToolCallCapture,
-    execute_tool_call,
-    parse_tool_calls,
-    tool_message,
-)
+from tools.animator.animator import animator
+from tools.browser.browser import show_in_browser
+from tools.scriptwriter.scriptwriter import script_writer
+from tools.storyteller.storyteller import story_teller
+from tools.tts.tts import kokoro_tts
 
 
-MODEL_NAME = "mlx-community/gemma-4-e4b-it-OptiQ-4bit"
-MAX_TOKENS = 128_000
-MAX_TOOL_ROUNDS = 16
-WORKSPACE = Path(__file__).resolve().parent
+def _result_output(result: str) -> str:
+    payload = json.loads(result)
+    return str(payload["output"])
 
 
-def load_model_and_tokenizer(model_name: str) -> tuple[Any, Any]:
-    model_path = _download(model_name)
-    # Gemma4 shared-KV checkpoints include unused K/V tensors for shared layers.
-    model, config = load_model(model_path, strict=False)
-    tokenizer = load_tokenizer(model_path, eos_token_ids=config.get("eos_token_id"))
-    return model, tokenizer
+def _result_metadata(result: str) -> dict[str, Any]:
+    payload = json.loads(result)
+    metadata = payload.get("metadata", {})
+    return metadata if isinstance(metadata, dict) else {}
 
 
-def _load_system_prompt() -> str:
-    return (WORKSPACE / "DIRECTOR.md").read_text(encoding="utf-8")
+def _json_text(text: str) -> str:
+    fenced = re.search(r"```(?:json)?\s*(.*?)\s*```", text, re.DOTALL | re.IGNORECASE)
+    if fenced:
+        return fenced.group(1).strip()
+    array = re.search(r"\[.*\]", text, re.DOTALL)
+    return array.group(0).strip() if array else text.strip()
 
 
-def _prompt_for(messages: list[dict[str, Any]], tokenizer: Any) -> str | list[int]:
-    return tokenizer.apply_chat_template(
-        messages,
-        add_generation_prompt=True,
-        tools=TOOL_SCHEMAS,
-    )
+def _script_scenes(script: str) -> list[Any]:
+    try:
+        parsed = json.loads(_json_text(script))
+    except json.JSONDecodeError:
+        return [script]
+
+    scenes = parsed.get("scenes") if isinstance(parsed, dict) else parsed
+    return scenes if isinstance(scenes, list) and scenes else [script]
 
 
-def stream_events(
-    model: Any,
-    tokenizer: Any,
-    messages: list[dict[str, Any]],
-) -> Iterator[dict[str, Any]]:
-    for _ in range(MAX_TOOL_ROUNDS + 1):
-        thought_stream = HiddenSpanCapture("<|channel>thought", "<channel|>")
-        stream = ToolCallCapture(tokenizer.tool_call_start, tokenizer.tool_call_end, hide_tool_calls=True)
-        prompt = _prompt_for(messages, tokenizer)
+def _scene_text(scene: Any, index: int) -> str:
+    if isinstance(scene, dict):
+        return json.dumps(scene, ensure_ascii=False, indent=2)
+    return f"Scene {index}:\n{scene}"
 
-        for chunk in stream_generate(
-            model,
-            tokenizer,
-            prompt=prompt,
-            max_tokens=MAX_TOKENS,
-        ):
-            visible = stream.push(thought_stream.push(chunk.text))
-            if visible:
-                yield {"type": "text_delta", "text": visible}
 
-        visible = stream.push(thought_stream.finish()) + stream.finish()
-        if visible:
-            yield {"type": "text_delta", "text": visible}
+def _dialogue_lines(scene: dict[str, Any]) -> list[dict[str, str]]:
+    dialogue = scene.get("dialogue", [])
+    if not isinstance(dialogue, list):
+        return []
 
-        if not stream.tool_texts:
-            yield {"type": "done"}
-            return
+    lines = []
+    for item in dialogue:
+        if not isinstance(item, dict):
+            continue
+        character = str(item.get("character", "Character")).strip() or "Character"
+        line = str(item.get("line", "")).strip()
+        if line:
+            lines.append({"character": character, "line": line})
+    return lines
 
-        tool_calls = parse_tool_calls(tokenizer, stream.tool_texts, TOOL_SCHEMAS)
-        messages.append(
-            {
-                "role": "assistant",
-                "content": stream.visible_text,
-                "tool_calls": tool_calls,
-            }
-        )
 
-        for tool_call in tool_calls:
-            name = tool_call["function"]["name"]
-            yield {"type": "tool_call", "name": name, "tool_call": tool_call}
-            yield {"type": "tool_start", "name": name, "tool_call": tool_call}
-            result = execute_tool_call(tool_call)
-            yield {
-                "type": "tool_result",
-                "name": name,
-                "tool_call": tool_call,
-                "result": result,
-            }
-            messages.append(tool_message(tool_call, result))
+def _with_scene_audio(scene: Any, index: int) -> tuple[Any, list[str]]:
+    if not isinstance(scene, dict):
+        return scene, []
 
-    raise RuntimeError(f"stopped after {MAX_TOOL_ROUNDS} tool rounds")
+    audio: list[dict[str, str]] = []
+    audio_paths: list[str] = []
+    voiceover = str(scene.get("voiceover", "")).strip()
+    if voiceover:
+        output_path = f"animations/audio/scene-{index:02d}-voiceover.wav"
+        result = kokoro_tts(voiceover, outputPath=output_path)
+        path = str(_result_metadata(result).get("output_path", output_path))
+        audio.append({"type": "voiceover", "text": voiceover, "path": path})
+        audio_paths.append(path)
+
+    for dialogue_index, item in enumerate(_dialogue_lines(scene), start=1):
+        output_path = f"animations/audio/scene-{index:02d}-dialogue-{dialogue_index:02d}.wav"
+        result = kokoro_tts(item["line"], outputPath=output_path)
+        path = str(_result_metadata(result).get("output_path", output_path))
+        audio.append({"type": "dialogue", "character": item["character"], "text": item["line"], "path": path})
+        audio_paths.append(path)
+
+    return {**scene, "audio": audio}, audio_paths
+
+
+def stream_events(user_input: str) -> Iterator[dict[str, Any]]:
+    yield {"type": "tool_start", "name": "story-teller"}
+    story = _result_output(story_teller(user_input))
+    yield {"type": "text_delta", "text": f"\nStory:\n{story}\n"}
+
+    yield {"type": "tool_start", "name": "script-writer"}
+    script = _result_output(script_writer(story))
+    yield {"type": "text_delta", "text": f"\nScript:\n{script}\n"}
+
+    animation_paths: list[str] = []
+    scenes = _script_scenes(script)
+    for index, scene in enumerate(scenes, start=1):
+        yield {"type": "tool_start", "name": f"kokoro-tts scene {index}"}
+        scene_with_audio, audio_paths = _with_scene_audio(scene, index)
+        for path in audio_paths:
+            yield {"type": "text_delta", "text": f"\nCreated audio: {path}\n"}
+
+        yield {"type": "tool_start", "name": f"animator scene {index}"}
+        title = f"scene-{index:02d}"
+        output_path = f"animations/{title}.html"
+        result = animator(_scene_text(scene_with_audio, index), title=title, outputPath=output_path)
+        metadata = _result_metadata(result)
+        if path := metadata.get("path"):
+            animation_paths.append(str(path))
+            yield {"type": "text_delta", "text": f"\nCreated animation: {path}\n"}
+
+    if animation_paths:
+        yield {"type": "tool_start", "name": "show-in-browser"}
+        yield {"type": "text_delta", "text": f"\n{_result_output(show_in_browser(targets=animation_paths))}\n"}
+
+    yield {"type": "done"}
 
 
 def render_events(events: Iterable[dict[str, Any]]) -> None:
@@ -115,14 +139,8 @@ def render_events(events: Iterable[dict[str, Any]]) -> None:
 
 
 def main() -> None:
-    model, tokenizer = load_model_and_tokenizer(MODEL_NAME)
     user_input = input("Enter your request: ")
-    messages: list[dict[str, Any]] = [
-        {"role": "system", "content": _load_system_prompt()},
-        {"role": "user", "content": user_input},
-    ]
-
-    render_events(stream_events(model, tokenizer, messages))
+    render_events(stream_events(user_input))
 
 
 if __name__ == "__main__":
