@@ -8,7 +8,7 @@ from mlx_lm.utils import _download, load_model, load_tokenizer
 from ..common import json_result
 
 MODEL_NAME = "mlx-community/gemma-4-e2b-it-OptiQ-4bit"
-MAX_TOKENS = 4096
+MAX_TOKENS = 128000
 
 
 def _load_model_and_tokenizer(model_name: str) -> tuple[Any, Any]:

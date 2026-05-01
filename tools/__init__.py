@@ -5,6 +5,7 @@ from typing import Callable
 from .browser.browser import show_in_browser
 from .files.files import write_file
 from .memory.memory import get_memories, memory
+from .scriptwriter.scriptwriter import script_writer
 from .soundtracks.soundtracks import search_soundtracks
 from .storyteller.storyteller import story_teller
 from .tts.tts import kokoro_tts
@@ -13,6 +14,7 @@ from .tts.tts import kokoro_tts
 TOOLS: dict[str, Callable[..., str]] = {
     "get-memories": get_memories,
     "story-teller": story_teller,
+    "script-writer": script_writer,
     "write-file": write_file,
     "memory": memory,
     "kokoro-tts": kokoro_tts,
@@ -35,6 +37,12 @@ TOOL_SCHEMAS = [
         story_teller.__doc__,
         {"prompt": {"type": "string"}},
         ["prompt"],
+    ),
+    _tool_schema(
+        "script-writer",
+        script_writer.__doc__,
+        {"story": {"type": "string"}},
+        ["story"],
     ),
     _tool_schema(
         "write-file",
