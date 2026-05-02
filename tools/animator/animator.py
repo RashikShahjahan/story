@@ -8,9 +8,9 @@ from typing import Any
 from mlx_lm import batch_generate
 from mlx_lm.utils import _download, load_model, load_tokenizer
 
-from ..common import WORKSPACE, json_result
+from ..common import WORKSPACE, apply_chat_template, clean_model_output, json_result
 
-MODEL_NAME = "mlx-community/Qwen3.5-4B-OptiQ-4bit"
+MODEL_NAME = "mlx-community/Qwen3.5-9B-OptiQ-4bit"
 MAX_TOKENS = 128000
 
 
@@ -53,9 +53,11 @@ def _strip_thinking(text: str) -> str:
 
 
 def _clean_html_response(text: str) -> str:
-    html = _strip_code_fence(_strip_thinking(text))
+    html = _strip_code_fence(clean_model_output(_strip_thinking(text)))
     html_start = re.search(r"<!doctype\s+html\b|<html\b", html, re.IGNORECASE)
-    return html[html_start.start() :].strip() if html_start else html
+    if not html_start:
+        raise ValueError("Animator model did not return an HTML document.")
+    return html[html_start.start() :].strip()
 
 
 def _chat_prompt(tokenizer: Any, animator_prompt: str, script: str, title: str | None) -> list[int]:
@@ -72,7 +74,7 @@ def _chat_prompt(tokenizer: Any, animator_prompt: str, script: str, title: str |
         },
         {"role": "user", "content": f"{title_line}Script or scene description:\n{script.strip()}"},
     ]
-    return tokenizer.apply_chat_template(messages, add_generation_prompt=True)
+    return apply_chat_template(tokenizer, messages)
 
 
 def _generate_animation_files(items: list[dict[str, str | None]]) -> list[dict[str, Any]]:

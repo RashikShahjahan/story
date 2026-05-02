@@ -5,7 +5,7 @@ from typing import Any
 from mlx_lm import stream_generate
 from mlx_lm.utils import _download, load_model, load_tokenizer
 
-from ..common import json_result
+from ..common import apply_chat_template, clean_model_output, json_result
 
 MODEL_NAME = "mlx-community/gemma-4-e2b-it-OptiQ-4bit"
 MAX_TOKENS = 128000
@@ -41,8 +41,8 @@ def script_writer(story: str) -> str:
         },
         {"role": "user", "content": story},
     ]
-    chat_prompt = tokenizer.apply_chat_template(messages, add_generation_prompt=True)
-    script = "".join(
+    chat_prompt = apply_chat_template(tokenizer, messages)
+    script = clean_model_output("".join(
         chunk.text
         for chunk in stream_generate(
             model,
@@ -50,6 +50,6 @@ def script_writer(story: str) -> str:
             prompt=chat_prompt,
             max_tokens=MAX_TOKENS,
         )
-    ).strip()
+    ))
 
     return json_result(script, {"success": True})

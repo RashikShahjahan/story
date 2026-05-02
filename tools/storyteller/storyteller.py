@@ -5,7 +5,7 @@ from typing import Any
 from mlx_lm import stream_generate
 from mlx_lm.utils import _download, load_model, load_tokenizer
 
-from ..common import json_result
+from ..common import apply_chat_template, clean_model_output, json_result
 
 MODEL_NAME = "mlx-community/gemma-4-e2b-it-OptiQ-4bit"
 MAX_TOKENS = 128000
@@ -25,8 +25,8 @@ def story_teller(prompt: str) -> str:
         {"role": "system", "content": "You are an expert storyteller. Write a complete, vivid short story from the user's brief."},
         {"role": "user", "content": prompt},
     ]
-    chat_prompt = tokenizer.apply_chat_template(messages, add_generation_prompt=True)
-    story = "".join(
+    chat_prompt = apply_chat_template(tokenizer, messages)
+    story = clean_model_output("".join(
         chunk.text
         for chunk in stream_generate(
             model,
@@ -34,6 +34,6 @@ def story_teller(prompt: str) -> str:
             prompt=chat_prompt,
             max_tokens=MAX_TOKENS,
         )
-    ).strip()
+    ))
 
     return json_result(story, {"success": True})
