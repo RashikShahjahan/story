@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Callable
 
-from .animator.animator import animator
+from .animator.animator import animator, batch_animator
 from .browser.browser import show_in_browser
 from .files.files import write_file
 from .scriptwriter.scriptwriter import script_writer
@@ -16,6 +16,7 @@ TOOLS: dict[str, Callable[..., str]] = {
     "story-teller": story_teller,
     "script-writer": script_writer,
     "animator": animator,
+    "batch-animator": batch_animator,
     "write-file": write_file,
     "kokoro-tts": kokoro_tts,
     "search-soundtracks": search_soundtracks,
@@ -53,6 +54,25 @@ TOOL_SCHEMAS = [
             "outputPath": {"type": "string"},
         },
         ["script"],
+    ),
+    _tool_schema(
+        "batch-animator",
+        batch_animator.__doc__,
+        {
+            "animations": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "script": {"type": "string"},
+                        "title": {"type": "string"},
+                        "outputPath": {"type": "string"},
+                    },
+                    "required": ["script"],
+                },
+            },
+        },
+        ["animations"],
     ),
     _tool_schema(
         "write-file",

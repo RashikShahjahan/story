@@ -6,7 +6,7 @@ import sys
 from collections.abc import Iterable, Iterator
 from typing import Any
 
-from tools.animator.animator import animator
+from tools.animator.animator import batch_animator
 from tools.browser.browser import show_in_browser
 from tools.scriptwriter.scriptwriter import script_writer
 from tools.storyteller.storyteller import story_teller
@@ -98,6 +98,7 @@ def stream_events(user_input: str) -> Iterator[dict[str, Any]]:
     yield {"type": "text_delta", "text": f"\nScript:\n{script}\n"}
 
     animation_paths: list[str] = []
+    animation_inputs: list[dict[str, str]] = []
     scenes = _script_scenes(script)
     for index, scene in enumerate(scenes, start=1):
         yield {"type": "tool_start", "name": f"kokoro-tts scene {index}"}
@@ -105,12 +106,19 @@ def stream_events(user_input: str) -> Iterator[dict[str, Any]]:
         for path in audio_paths:
             yield {"type": "text_delta", "text": f"\nCreated audio: {path}\n"}
 
-        yield {"type": "tool_start", "name": f"animator scene {index}"}
         title = f"scene-{index:02d}"
         output_path = f"animations/{title}.html"
-        result = animator(_scene_text(scene_with_audio, index), title=title, outputPath=output_path)
+        animation_inputs.append(
+            {"script": _scene_text(scene_with_audio, index), "title": title, "outputPath": output_path}
+        )
+
+    if animation_inputs:
+        yield {"type": "tool_start", "name": f"animator {len(animation_inputs)} scenes"}
+        result = batch_animator(animation_inputs)
         metadata = _result_metadata(result)
-        if path := metadata.get("path"):
+        for item in metadata.get("animations", []):
+            if not isinstance(item, dict) or not (path := item.get("path")):
+                continue
             animation_paths.append(str(path))
             yield {"type": "text_delta", "text": f"\nCreated animation: {path}\n"}
 

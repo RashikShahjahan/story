@@ -5,12 +5,12 @@ import time
 from pathlib import Path
 from typing import Any
 
-from mlx_lm import stream_generate
+from mlx_lm import batch_generate
 from mlx_lm.utils import _download, load_model, load_tokenizer
 
 from ..common import WORKSPACE, json_result
 
-MODEL_NAME = "mlx-community/Qwen3.5-9B-OptiQ-4bit"
+MODEL_NAME = "mlx-community/Qwen3.5-4B-OptiQ-4bit"
 MAX_TOKENS = 128000
 
 
@@ -58,11 +58,7 @@ def _clean_html_response(text: str) -> str:
     return html[html_start.start() :].strip() if html_start else html
 
 
-def animator(script: str, title: str | None = None, outputPath: str | None = None) -> str:
-    """Create a self-contained p5.js HTML animation from a script or scene description."""
-    model, tokenizer = _load_model_and_tokenizer(MODEL_NAME)
-    animator_prompt = (Path(__file__).resolve().parent / "ANIMATOR.md").read_text(encoding="utf-8")
-    output_path = _resolve_output_path(outputPath, title, script)
+def _chat_prompt(tokenizer: Any, animator_prompt: str, script: str, title: str | None) -> list[int]:
     title_line = f"Title: {title.strip()}\n\n" if title and title.strip() else ""
     messages: list[dict[str, Any]] = [
         {
@@ -76,22 +72,57 @@ def animator(script: str, title: str | None = None, outputPath: str | None = Non
         },
         {"role": "user", "content": f"{title_line}Script or scene description:\n{script.strip()}"},
     ]
-    chat_prompt = tokenizer.apply_chat_template(messages, add_generation_prompt=True)
-    html = _clean_html_response(
-        "".join(
-            chunk.text
-            for chunk in stream_generate(
-                model,
-                tokenizer,
-                prompt=chat_prompt,
-                max_tokens=MAX_TOKENS,
-            )
-        )
+    return tokenizer.apply_chat_template(messages, add_generation_prompt=True)
+
+
+def _generate_animation_files(items: list[dict[str, str | None]]) -> list[dict[str, Any]]:
+    if not items:
+        return []
+
+    model, tokenizer = _load_model_and_tokenizer(MODEL_NAME)
+    animator_prompt = (Path(__file__).resolve().parent / "ANIMATOR.md").read_text(encoding="utf-8")
+    output_paths = [
+        _resolve_output_path(item.get("outputPath"), item.get("title"), item["script"] or "")
+        for item in items
+    ]
+    prompts = [
+        _chat_prompt(tokenizer, animator_prompt, item["script"] or "", item.get("title"))
+        for item in items
+    ]
+    response = batch_generate(
+        model,
+        tokenizer,
+        prompts=prompts,
+        max_tokens=MAX_TOKENS,
     )
 
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(html, encoding="utf-8")
+    results = []
+    for output_path, text in zip(output_paths, response.texts, strict=True):
+        html = _clean_html_response(text)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(html, encoding="utf-8")
+        results.append({"path": str(output_path), "bytes": len(html.encode("utf-8"))})
+    return results
+
+
+def batch_animator(animations: list[dict[str, str | None]]) -> str:
+    """Create self-contained p5.js HTML animations from multiple script or scene descriptions."""
+    results = _generate_animation_files(animations)
     return json_result(
-        f"Created animation at {output_path}.",
-        {"success": True, "path": str(output_path), "bytes": len(html.encode("utf-8"))},
+        f"Created {len(results)} animations.",
+        {
+            "success": True,
+            "animations": results,
+            "paths": [item["path"] for item in results],
+        },
+    )
+
+
+def animator(script: str, title: str | None = None, outputPath: str | None = None) -> str:
+    """Create a self-contained p5.js HTML animation from a script or scene description."""
+    results = _generate_animation_files([{"script": script, "title": title, "outputPath": outputPath}])
+    result = results[0]
+    return json_result(
+        f"Created animation at {result['path']}.",
+        {"success": True, "path": result["path"], "bytes": result["bytes"]},
     )
