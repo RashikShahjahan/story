@@ -5,20 +5,10 @@ import time
 from pathlib import Path
 from typing import Any
 
-from mlx_lm import batch_generate
-from mlx_lm.utils import _download, load_model, load_tokenizer
+from ..common import WORKSPACE, clean_model_output, json_result, openrouter_chat_completion, openrouter_model
 
-from ..common import WORKSPACE, apply_chat_template, clean_model_output, json_result
-
-MODEL_NAME = "mlx-community/Qwen3.5-9B-OptiQ-4bit"
-MAX_TOKENS = 128000
-
-
-def _load_model_and_tokenizer(model_name: str) -> tuple[Any, Any]:
-    model_path = _download(model_name)
-    model, config = load_model(model_path, strict=False)
-    tokenizer = load_tokenizer(model_path, eos_token_ids=config.get("eos_token_id"))
-    return model, tokenizer
+MODEL_NAME = openrouter_model("OPENROUTER_ANIMATOR_MODEL")
+MAX_TOKENS = 32768
 
 
 def _safe_file_name(value: str) -> str:
@@ -60,7 +50,7 @@ def _clean_html_response(text: str) -> str:
     return html[html_start.start() :].strip()
 
 
-def _chat_prompt(tokenizer: Any, animator_prompt: str, script: str, title: str | None) -> list[int]:
+def _messages(animator_prompt: str, script: str, title: str | None) -> list[dict[str, Any]]:
     title_line = f"Title: {title.strip()}\n\n" if title and title.strip() else ""
     messages: list[dict[str, Any]] = [
         {
@@ -74,32 +64,26 @@ def _chat_prompt(tokenizer: Any, animator_prompt: str, script: str, title: str |
         },
         {"role": "user", "content": f"{title_line}Script or scene description:\n{script.strip()}"},
     ]
-    return apply_chat_template(tokenizer, messages)
+    return messages
 
 
 def _generate_animation_files(items: list[dict[str, str | None]]) -> list[dict[str, Any]]:
     if not items:
         return []
 
-    model, tokenizer = _load_model_and_tokenizer(MODEL_NAME)
     animator_prompt = (Path(__file__).resolve().parent / "ANIMATOR.md").read_text(encoding="utf-8")
     output_paths = [
         _resolve_output_path(item.get("outputPath"), item.get("title"), item["script"] or "")
         for item in items
     ]
-    prompts = [
-        _chat_prompt(tokenizer, animator_prompt, item["script"] or "", item.get("title"))
-        for item in items
-    ]
-    response = batch_generate(
-        model,
-        tokenizer,
-        prompts=prompts,
-        max_tokens=MAX_TOKENS,
-    )
 
     results = []
-    for output_path, text in zip(output_paths, response.texts, strict=True):
+    for output_path, item in zip(output_paths, items, strict=True):
+        text = openrouter_chat_completion(
+            _messages(animator_prompt, item["script"] or "", item.get("title")),
+            model=MODEL_NAME,
+            max_tokens=MAX_TOKENS,
+        )
         html = _clean_html_response(text)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(html, encoding="utf-8")

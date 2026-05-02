@@ -8,6 +8,5 @@ dependencies = [
     "en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",
     "misaki[en]>=0.9.4",
     "mlx-audio>=0.3.3",
-    "mlx-lm>=0.31.3",
     "soundfile>=0.13.1",
 ]
