@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-import time
 from pathlib import Path
 from typing import Any
 
@@ -13,23 +12,17 @@ MAX_TOKENS = 32768
 
 def _safe_file_name(value: str) -> str:
     slug = re.sub(r"[^a-z0-9._-]+", "-", value.lower()).strip("-.")
-    return slug[:80] or time.strftime("animation-%Y-%m-%dT%H-%M-%S")
+    return slug[:80] or "animation"
 
 
 def _resolve_output_path(output_path: str | None, title: str | None, script: str) -> Path:
     animations_dir = WORKSPACE / "animations"
-    if output_path is not None and output_path.strip():
+    if output_path and output_path.strip():
         path = Path(output_path.strip()).expanduser()
-        if path.is_absolute():
-            target = path if path.is_relative_to(animations_dir) else animations_dir / path.name
-        elif path.parts and path.parts[0] == "animations":
-            target = WORKSPACE / path
-        else:
-            target = animations_dir / path
-    else:
-        source = title.strip() if title and title.strip() else script[:48]
-        target = animations_dir / f"{_safe_file_name(source)}.html"
-    return target.with_suffix(".html")
+        return (path if path.is_absolute() else WORKSPACE / path).with_suffix(".html")
+
+    source = title.strip() if title and title.strip() else script[:48]
+    return animations_dir / f"{_safe_file_name(source)}.html"
 
 
 def _strip_code_fence(text: str) -> str:
@@ -37,13 +30,8 @@ def _strip_code_fence(text: str) -> str:
     return match.group(1).strip() if match else text.strip()
 
 
-def _strip_thinking(text: str) -> str:
-    text = re.sub(r"<think\b[^>]*>.*?</think>\s*", "", text, flags=re.DOTALL | re.IGNORECASE)
-    return re.sub(r"^\s*.*?</think>\s*", "", text, count=1, flags=re.DOTALL | re.IGNORECASE).strip()
-
-
 def _clean_html_response(text: str) -> str:
-    html = _strip_code_fence(clean_model_output(_strip_thinking(text)))
+    html = _strip_code_fence(clean_model_output(text))
     html_start = re.search(r"<!doctype\s+html\b|<html\b", html, re.IGNORECASE)
     if not html_start:
         raise ValueError("Animator model did not return an HTML document.")
@@ -52,7 +40,7 @@ def _clean_html_response(text: str) -> str:
 
 def _messages(animator_prompt: str, script: str, title: str | None) -> list[dict[str, Any]]:
     title_line = f"Title: {title.strip()}\n\n" if title and title.strip() else ""
-    messages: list[dict[str, Any]] = [
+    return [
         {
             "role": "system",
             "content": (
@@ -64,23 +52,16 @@ def _messages(animator_prompt: str, script: str, title: str | None) -> list[dict
         },
         {"role": "user", "content": f"{title_line}Script or scene description:\n{script.strip()}"},
     ]
-    return messages
 
 
 def _generate_animation_files(items: list[dict[str, str | None]]) -> list[dict[str, Any]]:
-    if not items:
-        return []
-
     animator_prompt = (Path(__file__).resolve().parent / "ANIMATOR.md").read_text(encoding="utf-8")
-    output_paths = [
-        _resolve_output_path(item.get("outputPath"), item.get("title"), item["script"] or "")
-        for item in items
-    ]
-
     results = []
-    for output_path, item in zip(output_paths, items, strict=True):
+    for item in items:
+        script = item["script"] or ""
+        output_path = _resolve_output_path(item.get("outputPath"), item.get("title"), script)
         text = openrouter_chat_completion(
-            _messages(animator_prompt, item["script"] or "", item.get("title")),
+            _messages(animator_prompt, script, item.get("title")),
             model=MODEL_NAME,
             max_tokens=MAX_TOKENS,
         )

@@ -89,8 +89,6 @@ TOOL_SCHEMAS = [
             "voice": {"type": "string"},
             "langCode": {"type": "string"},
             "speed": {"type": "number"},
-            "splitPattern": {"type": "string"},
-            "device": {"type": "string"},
         },
         ["text"],
     ),

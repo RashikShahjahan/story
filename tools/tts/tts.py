@@ -14,11 +14,11 @@ SAMPLE_RATE = 24_000
 
 
 def _safe_file_name(value: str) -> str:
-    return re.sub(r"[^a-z0-9._-]+", "-", value.lower()).strip("-")[:80]
+    return re.sub(r"[^a-z0-9._-]+", "-", value.lower()).strip("-")[:80] or "speech"
 
 
 def _resolve_output_path(output_path: str | None, text: str) -> Path:
-    if output_path is not None:
+    if output_path:
         path = Path(output_path.strip())
         resolved = path if path.is_absolute() else WORKSPACE / path
         return resolved.with_suffix(".wav")
@@ -39,8 +39,6 @@ def kokoro_tts(
     voice: str = DEFAULT_TTS_VOICE,
     langCode: str = DEFAULT_LANG_CODE,
     speed: float = 1.0,
-    splitPattern: str = r"\n+",
-    device: str = "auto",
 ) -> str:
     """Convert text to speech with MLX-Audio Kokoro and save the generated audio as a WAV file."""
     text = text.strip()
@@ -54,15 +52,8 @@ def kokoro_tts(
 
     voice_name = voice.strip()
     lang_code = langCode.strip()
-    split_pattern = splitPattern.strip()
-
     model = load_model(MODEL_NAME)
-    chunks = []
-    for result in model.generate(text=text, voice=voice_name, speed=speed, lang_code=lang_code):
-        chunks.append(_as_audio_array(result.audio))
-
-    if not chunks:
-        raise RuntimeError("MLX-Audio Kokoro did not return any audio chunks.")
+    chunks = [_as_audio_array(result.audio) for result in model.generate(text=text, voice=voice_name, speed=speed, lang_code=lang_code)]
 
     audio = np.concatenate(chunks)
     sample_rate = int(getattr(model, "sample_rate", SAMPLE_RATE) or SAMPLE_RATE)
@@ -77,8 +68,6 @@ def kokoro_tts(
             "voice": voice_name,
             "lang_code": lang_code,
             "speed": speed,
-            "split_pattern": split_pattern,
-            "device": "mlx",
             "duration_seconds": duration_seconds,
             "sample_rate": sample_rate,
         },

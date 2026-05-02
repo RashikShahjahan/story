@@ -22,9 +22,9 @@ def search_soundtracks(
     """Search Openverse audio for soundtrack and ambience tracks."""
     query = query.strip()
     params = {"q": query, "page_size": str(count), "page": str(page)}
-    for key, value in {"category": category, "source": source, "license": license, "extension": extension}.items():
-        if value:
-            params[key] = value.strip()
+    params.update(
+        {key: value.strip() for key, value in {"category": category, "source": source, "license": license, "extension": extension}.items() if value}
+    )
     url = "https://api.openverse.org/v1/audio/?" + urllib.parse.urlencode(params)
     request = urllib.request.Request(url, headers={"Accept": "application/json", "User-Agent": "story-animation/1.0"})
     with urllib.request.urlopen(request, timeout=30) as response:
@@ -42,14 +42,12 @@ def search_soundtracks(
             continue
         results.append(
             {
-                "id": item.get("id"),
                 "title": item.get("title"),
                 "creator": item.get("creator"),
                 "audio_url": audio_url,
                 "landing_url": item.get("foreign_landing_url"),
                 "license": item.get("license"),
                 "license_version": item.get("license_version"),
-                "license_url": item.get("license_url"),
                 "source": item.get("source"),
                 "filetype": item.get("filetype"),
                 "duration_seconds": round(duration_ms / 1000) if duration_ms else None,

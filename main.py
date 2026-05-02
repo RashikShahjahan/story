@@ -14,14 +14,11 @@ from tools.tts.tts import kokoro_tts
 
 
 def _result_output(result: str) -> str:
-    payload = json.loads(result)
-    return str(payload["output"])
+    return json.loads(result)["output"]
 
 
 def _result_metadata(result: str) -> dict[str, Any]:
-    payload = json.loads(result)
-    metadata = payload.get("metadata", {})
-    return metadata if isinstance(metadata, dict) else {}
+    return json.loads(result)["metadata"]
 
 
 def _json_text(text: str) -> str:
@@ -33,59 +30,44 @@ def _json_text(text: str) -> str:
 
 
 def _script_scenes(script: str) -> list[Any]:
-    try:
-        parsed = json.loads(_json_text(script))
-    except json.JSONDecodeError:
-        return [script]
-
+    parsed = json.loads(_json_text(script))
     scenes = parsed.get("scenes") if isinstance(parsed, dict) else parsed
-    return scenes if isinstance(scenes, list) and scenes else [script]
+    return scenes
 
 
-def _scene_text(scene: Any, index: int) -> str:
-    if isinstance(scene, dict):
-        return json.dumps(scene, ensure_ascii=False, indent=2)
-    return f"Scene {index}:\n{scene}"
+def _scene_text(scene: Any) -> str:
+    return json.dumps(scene, ensure_ascii=False, indent=2)
 
 
 def _dialogue_lines(scene: dict[str, Any]) -> list[dict[str, str]]:
-    dialogue = scene.get("dialogue", [])
-    if not isinstance(dialogue, list):
-        return []
-
     lines = []
-    for item in dialogue:
-        if not isinstance(item, dict):
-            continue
-        character = str(item.get("character", "Character")).strip() or "Character"
-        line = str(item.get("line", "")).strip()
+    for item in scene["dialogue"]:
+        character = item["character"].strip()
+        line = item["line"].strip()
         if line:
             lines.append({"character": character, "line": line})
     return lines
 
 
 def _with_scene_audio(scene: Any, index: int) -> tuple[Any, list[str]]:
-    if not isinstance(scene, dict):
-        return scene, []
-
     audio: list[dict[str, str]] = []
     audio_paths: list[str] = []
-    voiceover = str(scene.get("voiceover", "")).strip()
+    voiceover = scene["voiceover"].strip()
     if voiceover:
         output_path = f"animations/audio/scene-{index:02d}-voiceover.wav"
         result = kokoro_tts(voiceover, outputPath=output_path)
-        path = str(_result_metadata(result).get("output_path", output_path))
+        path = _result_metadata(result)["output_path"]
         audio.append({"type": "voiceover", "text": voiceover, "path": path})
         audio_paths.append(path)
 
     for dialogue_index, item in enumerate(_dialogue_lines(scene), start=1):
         output_path = f"animations/audio/scene-{index:02d}-dialogue-{dialogue_index:02d}.wav"
         result = kokoro_tts(item["line"], outputPath=output_path)
-        path = str(_result_metadata(result).get("output_path", output_path))
+        path = _result_metadata(result)["output_path"]
         audio.append({"type": "dialogue", "character": item["character"], "text": item["line"], "path": path})
         audio_paths.append(path)
 
-    return {**scene, "audio": audio}, audio_paths
+    return scene | {"audio": audio}, audio_paths
 
 
 def stream_events(user_input: str) -> Iterator[dict[str, Any]]:
@@ -109,17 +91,16 @@ def stream_events(user_input: str) -> Iterator[dict[str, Any]]:
         title = f"scene-{index:02d}"
         output_path = f"animations/{title}.html"
         animation_inputs.append(
-            {"script": _scene_text(scene_with_audio, index), "title": title, "outputPath": output_path}
+            {"script": _scene_text(scene_with_audio), "title": title, "outputPath": output_path}
         )
 
     if animation_inputs:
         yield {"type": "tool_start", "name": f"animator {len(animation_inputs)} scenes"}
         result = batch_animator(animation_inputs)
         metadata = _result_metadata(result)
-        for item in metadata.get("animations", []):
-            if not isinstance(item, dict) or not (path := item.get("path")):
-                continue
-            animation_paths.append(str(path))
+        for item in metadata["animations"]:
+            path = item["path"]
+            animation_paths.append(path)
             yield {"type": "text_delta", "text": f"\nCreated animation: {path}\n"}
 
     if animation_paths:

@@ -8,7 +8,4 @@ def write_file(path: str, content: str) -> str:
     target = (WORKSPACE / path.strip()).resolve()
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(content, encoding="utf-8")
-    return json_result(
-        f"Wrote {target}.",
-        {"success": True, "path": str(target), "bytes": len(content.encode("utf-8"))},
-    )
+    return json_result(f"Wrote {target}.", {"path": str(target)})

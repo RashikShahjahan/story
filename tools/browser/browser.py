@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import re
 import webbrowser
 from pathlib import Path
 
 from ..common import WORKSPACE, json_result
 
 
-def show_in_browser(target: str | None = None, targets: list[str] | None = None, secondsPerAnimation: float = 8) -> str:
+def show_in_browser(target: str = "", targets: list[str] | None = None, secondsPerAnimation: float = 8) -> str:
     """Open one local HTML file/URL, or show multiple local animation files as a slideshow."""
     selected_targets = [stripped for item in targets or [] if (stripped := item.strip())]
     if selected_targets:
@@ -26,7 +25,7 @@ def show_in_browser(target: str | None = None, targets: list[str] | None = None,
         return json_result(f"Opened {len(selected_targets)} animations one by one in {preview}.", {"preview_path": str(preview)})
 
     item = target.strip()
-    if re.match(r"^https?://", item, re.IGNORECASE):
+    if item.lower().startswith(("http://", "https://")):
         webbrowser.open(item)
         return json_result(f"Opened {item} in the browser.")
     path = Path(item) if Path(item).is_absolute() else WORKSPACE / item
